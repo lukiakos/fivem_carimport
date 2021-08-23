@@ -1,2 +1,4 @@
 # fivem_carimport
-A simple FiveM car import script, customizable through a config file.
+Egyszerű autóimportáló script. Könnyen testre szabható a config file-on keresztül.
+
+Eredetileg a Dark Life Roleplay szerverhez írva.
