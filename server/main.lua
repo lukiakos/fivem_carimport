@@ -7,12 +7,10 @@ local frakciopenz = nil
 
 ESX.RegisterServerCallback('sacra_carimport:automentes', function(source, cb, rendeles, generatedPlates)
     local xPlayer = ESX.GetPlayerFromId(source)
+    local currentPlate = nil
     for x,y in pairs(rendeles) do
-        print(x)
-        local currentPlate = nil
-        for k,v in pairs(generatedPlates) do
-            currentPlate = v
-            print(currentPlate)
+        for var=1,y do
+            currentPlate = generatedPlates[var]
             MySQL.Async.execute('INSERT INTO owned_vehicles (owner, state, plate, vehicle) VALUES (@owner, @state, @plate, @vehicle)', {
                 ['@owner'] = xPlayer.identifier,
                 ['@state'] = 1,
@@ -22,8 +20,10 @@ ESX.RegisterServerCallback('sacra_carimport:automentes', function(source, cb, re
                 xPlayer.showNotification('A garazsadban van tuzi', false, true)
                 cb(true)
                 end)
+            end
+        for var=1,y do
+            table.remove(generatedPlates, 1)
         end
-
     end
 
 end)

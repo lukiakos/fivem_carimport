@@ -13,7 +13,9 @@ local kamionlerakva = false
 local generatedPlates = {}
 local osszeg = 0
 local autoar = 0
-local vegosszeg = {}
+local vegosszeg = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+local osszeg2 = 0
+local vegleges = false
 
 Citizen.CreateThread(function()
 	while ESX == nil do
@@ -62,28 +64,31 @@ function RendeloMenu()
     }, function(data, menu)
         menu.close()
         menunyitva = false
-        if data.current.value == 'blista' and not kamionlerakva then
+        if data.current.value == 'blista' and not kamionlerakva and not vegleges then
             local carid = 1
             local value = data.current.value
-            MenuValasztott(carid,value)
+            MenuValasztott(carid,value,rendeles)
         end
-        if data.current.value == 'adder' and not kamionlerakva then
+        if data.current.value == 'adder' and not kamionlerakva and not vegleges then
             local carid = 2
             local value = data.current.value
-            MenuValasztott(carid,value)
+            MenuValasztott(carid,value,rendeles)
         end
-        if data.current.value == 'voltic' and not kamionlerakva then
+        if data.current.value == 'voltic' and not kamionlerakva and not vegleges then
             local carid = 3
             local value = data.current.value
-            MenuValasztott(carid,value)
+            MenuValasztott(carid,value,rendeles)
         end
-        if data.current.value == 'phoenix' and not kamionlerakva then
+        if data.current.value == 'phoenix' and not kamionlerakva and not vegleges then
             local carid = 4
             local value = data.current.value
-            MenuValasztott(carid,value)
+            MenuValasztott(carid,value,rendeles)
         end
         if kamionlerakva then
             ESX.ShowNotification('Már lekérted a kamiont.', true, true)
+        end
+        if vegleges then
+            ESX.ShowNotification('Már véglegesítetted a rendelést', true, true)
         end
     end,
     function(data, menu)
@@ -92,7 +97,33 @@ function RendeloMenu()
     end)
 end
 
-function MenuValasztott(carid,value)
+function Veglegesit(carid,value,rendeles)
+    ESX.UI.Menu.Open('default', GetCurrentResourceName(), 'veglegsito', {
+        title = 'Véglegesíted a rendelést?',
+        align = "left",
+        elements = igenmenu
+    }, function(data, menu)
+        menu.close()
+        menunyitva = false
+        if data.current.value == 'igen' then
+            vegleges = true
+            osszegSzamolo(carid)
+            ESX.ShowNotification('Ennyit kell fizetned: ' .. '~g~' .. osszeg)
+            if not hasCreatedMarkers then
+                CreateMarkers(result,value,rendeles)
+            end
+        end
+        if data.current.value == 'nem' then
+            vegleges = false
+        end
+    end,
+    function(data, menu)
+        menu.close()
+        menunyitva = false
+    end)
+end
+
+function MenuValasztott(carid,value,rendeles)
     megrendelve = true
     DisplayOnscreenKeyboard(1, "FMMC_MPM_NA", "", "", "", "", "", 30)
         while (UpdateOnscreenKeyboard() == 0) do
@@ -102,29 +133,27 @@ function MenuValasztott(carid,value)
     if (GetOnscreenKeyboardResult()) then
         local result = GetOnscreenKeyboardResult()
         rendeles[value] = result
-        osszeg = osszeg + (autok[carid].price * result)
-        osszegSzamolo(osszeg,carid,value,result)
-        ESX.ShowNotification('Eddig ennyit kell fizetned' .. osszeg)
-        if not hasCreatedMarkers then
-            CreateMarkers(result,value,rendeles)
-        end
+        Veglegesit(carid,value,rendeles)
     end
 end
 
-function osszegSzamolo(osszeg,carid,value,result)
+function osszegSzamolo(carid)
     for v,k in pairs(rendeles) do
         for x,y in pairs(autok) do
             if y.value == v then
-                autoar = y.price * k
-                table.remove(vegosszeg, carid)
-                table.insert(vegosszeg,tonumber(carid),autoar)
-                print(vegosszeg[1])
-                for z,q in pairs(vegosszeg) do
-                    print(z,q)
-                end
+                local autoar = y.price * k
+                table.remove(vegosszeg,tonumber(y.carid))
+                table.insert(vegosszeg,tonumber(y.carid),autoar)
             end
         end
     end
+    for p,d in pairs(vegosszeg) do
+        osszeg = osszeg + d
+    end
+end
+
+function Nullazo()
+    vegosszeg = {0,0,0,0,0,0,0,0,0,0,0,0,0}
 end
 
 
@@ -134,6 +163,8 @@ function CreateMarkers(result,value,rendeles)
     rendelesleadva = true
     local felvevo = Config.FelvevoHely
     local ped = PlayerPedId()
+    local felvevoblip = AddBlipForCoord(felvevo.x,felvevo.y,felvevo.z)
+    SetBlipRoute(felvevoblip, true)
     local sacranev = Config.SacraNev
     while megrendelve do
         local coords = GetEntityCoords(ped)
@@ -144,11 +175,14 @@ function CreateMarkers(result,value,rendeles)
             if tavolsag < 20 then
                 Draw3DText(felvevo.x,felvevo.y,felvevo.z + 0.5, 'Nyomj ~y~[E]~w~-t a rendelés kamionra pakolásához', 0.4)
                 if tavolsag < 2.5 then
+                    SetBlipRoute(felvevoblip, false)
                     ESX.ShowHelpNotification('Nyomj ~y~[E]~w~-t a rendelés kamionra pakolásához', true, false)
-                    if IsControlJustReleased(1, 38) then
+                    if IsControlJustReleased(1, 38) and vegleges then
+                        RemoveBlip(felvevoblip)
                         Fizet(osszeg,result,value,rendeles)
-                        KamionLerak()
-                        megrendelve = false
+                    end
+                    if not vegleges then
+                        ESX.ShowNotification('Nem véglegesítetted a rendelést', true, true)
                     end
                 end
             end
@@ -156,35 +190,52 @@ function CreateMarkers(result,value,rendeles)
     end
 end
 
+RegisterCommand('heading', function()
+    local ped = PlayerPedId()
+    print(GetEntityHeading(ped))
+end,false)
+
 function Fizet(osszeg,result,value,rendeles)
-    print('jheltgwetui')
     ESX.TriggerServerCallback('sacra_carimport:frakciopenzlevonas', function(success)
         if success then
-            print('asndwrfh')
+            megrendelve = false
             generatedPlates = {}
             for k,v in pairs(rendeles) do
-                print(k, v)
                 for var=1,v do
                     local ideiglenesplate = GeneratePlate()
-                    print(ideiglenesplate)
                     table.insert(generatedPlates, ideiglenesplate)
                 end
             end
-            for k,v in pairs(generatedPlates) do
-                print(k, v)
-            end
+            ESX.ShowNotification('~g~Szállj be a kamionba, és szállítsd el az autókat a Sacra Car autókereskedéshez!', true, true)
+            KamionLerak()
+        else
+            megrendelve = true
         end
     end, osszeg)
 end
 
 function KamionLerak()
-    ESX.Game.SpawnVehicle('tr4', Config.TrailerSpawnPoint, GetEntityHeading(), function(vehicle)
-        SetVehicleNumberPlateText(vehicle, 'SACRA' .. GetRandomNumber(3))
-    end)
-    ESX.Game.SpawnVehicle('packer', Config.KamionSpawnPoint, GetEntityHeading(), function(vehicle)
-        SetVehicleNumberPlateText(vehicle, 'SACRA' .. GetRandomNumber(3))
-        SetVehicleFuelLevel(vehicle, 60.0)
-    end)
+    local trspawn = Config.TrailerSpawnPoint
+    local kamspawn = Config.KamionSpawnPoint
+
+    RequestModel('tr4') 
+    while not HasModelLoaded('tr4') do
+        Citizen.Wait(10)
+    end
+    ideiglenestrailer = CreateVehicle('tr4',trspawn.x,trspawn.y,trspawn.z,75.10,true,false)
+    SetModelAsNoLongerNeeded('tr4')
+    SetVehicleNumberPlateText(ideiglenestrailer, 'SACRA' .. GetRandomNumber(3))
+
+    RequestModel('packer') 
+    while not HasModelLoaded('packer') do
+        Citizen.Wait(10)
+    end
+    ideigleneskamion = CreateVehicle('packer',kamspawn.x,kamspawn.y,kamspawn.z,207.87,true,false)
+    SetModelAsNoLongerNeeded('packer')
+    SetVehicleNumberPlateText(ideigleneskamion, 'SACRA' .. GetRandomNumber(3))
+    SetVehicleFuelLevel(ideigleneskamion, 60.0)
+    SetVehicleColours(ideigleneskamion,28,28)
+
     szallitasalatt = true
     kamionlerakva = true
     Leszallit()
@@ -193,6 +244,8 @@ end
 function Leszallit()
     local leado = Config.LeszallitoCP
     local ped = PlayerPedId()
+    local leadoblip = AddBlipForCoord(leado.x,leado.y,leado.z)
+    SetBlipRoute(leadoblip,true)
     while szallitasalatt do
         local coords = GetEntityCoords(ped)
         local tavolsag = Vdist(coords, leado)
@@ -200,13 +253,12 @@ function Leszallit()
         if ESX.PlayerData.job.name == sacranev then
             local leadomarker = DrawMarker(1,leado.x,leado.y,leado.z - 1,0.0,0.0,0.0,0.0,180,0.0,5.0,5.0,5.0,0,255,0,200,false,false,2,false,nil,nil,false)
             if tavolsag < 20 then
-                print('Helo')
                 Draw3DText(leado.x,leado.y,leado.z + 0.5, 'Nyomj ~y~[E]~w~-t, hogy leszállítsd az autókat.', 0.4)
                 if tavolsag < 2.5 then
                     if IsControlJustReleased(1, 38) then
-                        print('kurva')
+                        SetBlipRoute(leadoblip, false)
+                        RemoveBlip(leadoblip)
                         Tarolas()
-                        szallitasalatt = false
                     end
                 end
             end
@@ -216,17 +268,26 @@ end
 
 function Tarolas()
     local ped = PlayerPedId()
-    ESX.Game.DeleteVehicle(GetVehiclePedIsIn(ped,false))
+    if IsPedSittingInVehicle(ped, ideigleneskamion) then
+        ESX.Game.DeleteVehicle(ideigleneskamion)
+        ESX.Game.DeleteVehicle(ideiglenestrailer)
 
-    ESX.TriggerServerCallback('sacra_carimport:automentes', function(success)
-        if success then
-            ESX.ShowNotification('~g~Sikeres ~w~importálás. Az autókat megtalálhatod a garázsodban.', true, true)
-        else
-            ESX.ShowNotification('~r~Valami hiba történt!', true, true)
-        end
-    end, rendeles, generatedPlates)
-    kamionlerakva = false
-    hasCreatedMarkers = false
+        ESX.TriggerServerCallback('sacra_carimport:automentes', function(success)
+            if success then
+                ESX.ShowNotification('~g~Sikeres ~w~importálás. Az autókat megtalálhatod a garázsodban.', true, true)
+            else
+                ESX.ShowNotification('~r~Valami hiba történt!', true, true)
+            end
+        end, rendeles, generatedPlates)
+        kamionlerakva = false
+        hasCreatedMarkers = false
+        osszeg = 0
+        vegleges = false
+        szallitasalatt = false
+    else
+        ESX.ShowNotification('~r~A lekért kamionban kell ülnöd!', true, true)
+        szallitasalatt = true
+    end
 end
 
 
