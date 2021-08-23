@@ -35,21 +35,21 @@ AddEventHandler('esx:setJob', function(job)
   PlayerData.job = job
 end)
 
+
 Citizen.CreateThread(function() -- Rendelő panel felirat megjelenítése ha a player Sacra Car leader vagy Al-Leader
     local rendelocp = Config.RendeloCPLoc -- Configban átírható a rendelő cp helye
     local sacranev = Config.SacraNev -- Configban átírható a szerveren használt sacra job nevére
     while true do
-        Citizen.Wait(2)
-        if ESX.PlayerData.job.name == sacranev and ESX.PlayerData.job.grade == 4 then
-            hasznalhat = true
-        elseif ESX.PlayerData.job.name == sacranev and ESX.PlayerData.job.grade == 3 then
-            hasznalhat = true
-        end
-        if kozeli and hasznalhat then -- Ha elég közel van, és leader vagy alleader, akkor jelenik meg a felirat, illetve akkor tudja megnyitni a panelt
-            Draw3DText(rendelocp.x, rendelocp.y, rendelocp.z, "Nyomj ~y~[E]~w~-t a panel megjelenítéséhez.", 0.4)
-            if Vdist(GetEntityCoords(PlayerPedId()), Config.RendeloCPLoc) < 1 and IsControlJustReleased(1, 38) and not menunyitva then
-                ESX.UI.Menu.CloseAll()
-                RendeloMenu()
+        Citizen.Wait(4)
+        if kozeli then -- Ha elég közel van, és leader vagy alleader, akkor jelenik meg a felirat, illetve akkor tudja megnyitni a panelt
+            if ESX.PlayerData.job.name == sacranev then
+                if ESX.PlayerData.job.grade == 3 or ESX.PlayerData.job.grade == 4 then
+                    Draw3DText(rendelocp.x, rendelocp.y, rendelocp.z, "Nyomj ~y~[E]~w~-t a panel megjelenítéséhez.", 0.4)
+                    if Vdist(GetEntityCoords(PlayerPedId()), Config.RendeloCPLoc) < 1 and IsControlJustReleased(1, 38) and not menunyitva then
+                        ESX.UI.Menu.CloseAll()
+                        RendeloMenu()
+                    end
+                end
             end
         end
     end
@@ -115,6 +115,7 @@ function Veglegesit(carid,value,rendeles)
         end
         if data.current.value == 'nem' then
             vegleges = false
+            RendeloMenu()
         end
     end,
     function(data, menu)
