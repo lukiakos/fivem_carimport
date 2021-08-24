@@ -16,18 +16,21 @@ local autoar = 0
 local vegosszeg = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 local osszeg2 = 0
 local vegleges = false
+local melo = nil
+local munkalekerve = false
+local gradelekerve = false
 
 Citizen.CreateThread(function()
 	while ESX == nil do
 		TriggerEvent('esx:getSharedObject', function(obj) ESX = obj end)
 		Citizen.Wait(0)
 	end
+    ped = PlayerPedId()
 end)
 
 RegisterNetEvent('esx:playerLoaded')
 AddEventHandler('esx:playerLoaded', function(xPlayer)
-  PlayerData = xPlayer
-  Citizen.Wait(10000)
+  PlayerData = xPlayer   
 end)
 
 RegisterNetEvent('esx:setJob')
@@ -35,6 +38,17 @@ AddEventHandler('esx:setJob', function(job)
   PlayerData.job = job
 end)
 
+Citizen.CreateThread(function() -- Eldöntjük, hogy a játékos elég közel van-e a rendelő CP-hez (configban átírható)
+    while true do
+        local coords = GetEntityCoords(PlayerPedId())
+        Citizen.Wait(500)
+        if Vdist(coords, Config.RendeloCPLoc) < 5 then
+            kozeli = true
+        else
+            kozeli = false
+        end
+    end
+end)
 
 Citizen.CreateThread(function() -- Rendelő panel felirat megjelenítése ha a player Sacra Car leader vagy Al-Leader
     local rendelocp = Config.RendeloCPLoc -- Configban átírható a rendelő cp helye
@@ -42,8 +56,10 @@ Citizen.CreateThread(function() -- Rendelő panel felirat megjelenítése ha a p
     while true do
         Citizen.Wait(4)
         if kozeli then -- Ha elég közel van, és leader vagy alleader, akkor jelenik meg a felirat, illetve akkor tudja megnyitni a panelt
-            if ESX.PlayerData.job.name == sacranev then
-                if ESX.PlayerData.job.grade == 3 or ESX.PlayerData.job.grade == 4 then
+            if not munkalekerve then sacragetJob() end
+            if not gradelekerve then sacragetGrade() end
+            if frakcio == sacranev then
+                if frakgrade == 3 or frakgrade == 4 then
                     Draw3DText(rendelocp.x, rendelocp.y, rendelocp.z, "Nyomj ~y~[E]~w~-t a panel megjelenítéséhez.", 0.4)
                     if Vdist(GetEntityCoords(PlayerPedId()), Config.RendeloCPLoc) < 1 and IsControlJustReleased(1, 38) and not menunyitva then
                         ESX.UI.Menu.CloseAll()
@@ -55,6 +71,20 @@ Citizen.CreateThread(function() -- Rendelő panel felirat megjelenítése ha a p
     end
 end)
 
+function sacragetGrade()
+    gradelekerve = true
+    ESX.TriggerServerCallback('sacra_carimport:getGrade', function(grade)
+        frakgrade = grade
+    end)
+end
+
+function sacragetJob()
+    munkalekerve = true
+    ESX.TriggerServerCallback('sacra_carimport:getJob', function(melo)
+        frakcio = melo
+    end)
+end
+
 function RendeloMenu()
     menunyitva = true
     ESX.UI.Menu.Open('default', GetCurrentResourceName(), 'autorendelo1', {
@@ -64,23 +94,8 @@ function RendeloMenu()
     }, function(data, menu)
         menu.close()
         menunyitva = false
-        if data.current.value == 'blista' and not kamionlerakva and not vegleges then
-            local carid = 1
-            local value = data.current.value
-            MenuValasztott(carid,value,rendeles)
-        end
-        if data.current.value == 'adder' and not kamionlerakva and not vegleges then
-            local carid = 2
-            local value = data.current.value
-            MenuValasztott(carid,value,rendeles)
-        end
-        if data.current.value == 'voltic' and not kamionlerakva and not vegleges then
-            local carid = 3
-            local value = data.current.value
-            MenuValasztott(carid,value,rendeles)
-        end
-        if data.current.value == 'phoenix' and not kamionlerakva and not vegleges then
-            local carid = 4
+        if not kamionlerakva and not vegleges then
+            local carid = data.current.carid
             local value = data.current.value
             MenuValasztott(carid,value,rendeles)
         end
@@ -153,17 +168,12 @@ function osszegSzamolo(carid)
     end
 end
 
-function Nullazo()
-    vegosszeg = {0,0,0,0,0,0,0,0,0,0,0,0,0}
-end
-
-
 
 function CreateMarkers(result,value,rendeles)
     hasCreatedMarkers = true
     rendelesleadva = true
-    local felvevo = Config.FelvevoHely
     local ped = PlayerPedId()
+    local felvevo = Config.FelvevoHely
     local felvevoblip = AddBlipForCoord(felvevo.x,felvevo.y,felvevo.z)
     SetBlipRoute(felvevoblip, true)
     local sacranev = Config.SacraNev
@@ -171,7 +181,7 @@ function CreateMarkers(result,value,rendeles)
         local coords = GetEntityCoords(ped)
         local tavolsag = Vdist(coords, felvevo)
         Citizen.Wait(4)
-        if ESX.PlayerData.job.name == sacranev then
+        if frakcio == sacranev then
             local felvevomarker = DrawMarker(1,felvevo.x,felvevo.y,felvevo.z - 1,0.0,0.0,0.0,0.0,180,0.0,5.0,5.0,5.0,0,255,0,200,false,false,2,false,nil,nil,false)
             if tavolsag < 20 then
                 Draw3DText(felvevo.x,felvevo.y,felvevo.z + 0.5, 'Nyomj ~y~[E]~w~-t a rendelés kamionra pakolásához', 0.4)
@@ -192,7 +202,6 @@ function CreateMarkers(result,value,rendeles)
 end
 
 RegisterCommand('heading', function()
-    local ped = PlayerPedId()
     print(GetEntityHeading(ped))
 end,false)
 
@@ -244,14 +253,13 @@ end
 
 function Leszallit()
     local leado = Config.LeszallitoCP
-    local ped = PlayerPedId()
     local leadoblip = AddBlipForCoord(leado.x,leado.y,leado.z)
     SetBlipRoute(leadoblip,true)
     while szallitasalatt do
         local coords = GetEntityCoords(ped)
         local tavolsag = Vdist(coords, leado)
         Citizen.Wait(2)
-        if ESX.PlayerData.job.name == sacranev then
+        if frakcio == sacranev then
             local leadomarker = DrawMarker(1,leado.x,leado.y,leado.z - 1,0.0,0.0,0.0,0.0,180,0.0,5.0,5.0,5.0,0,255,0,200,false,false,2,false,nil,nil,false)
             if tavolsag < 20 then
                 Draw3DText(leado.x,leado.y,leado.z + 0.5, 'Nyomj ~y~[E]~w~-t, hogy leszállítsd az autókat.', 0.4)
@@ -268,7 +276,6 @@ function Leszallit()
 end
 
 function Tarolas()
-    local ped = PlayerPedId()
     if IsPedSittingInVehicle(ped, ideigleneskamion) then
         ESX.Game.DeleteVehicle(ideigleneskamion)
         ESX.Game.DeleteVehicle(ideiglenestrailer)
@@ -291,23 +298,6 @@ function Tarolas()
     end
 end
 
-
-
-Citizen.CreateThread(function() -- Eldöntjük, hogy a játékos elég közel van-e a rendelő CP-hez (configban átírható)
-    local ped = PlayerPedId()
-    while true do
-        local coords = GetEntityCoords(ped)
-        Citizen.Wait(500)
-        if Vdist(coords, Config.RendeloCPLoc) < 5 then
-            kozeli = true
-        else
-            kozeli = false
-        end
-    end
-end)
-
-
-  
 local NumberCharset = {}
 local Charset = {}
 

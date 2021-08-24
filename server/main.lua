@@ -44,9 +44,22 @@ ESX.RegisterServerCallback('sacra_carimport:frakciopenzlevonas', function(source
     end)
 end)
 
-ESX.RegisterServerCallback('sacra_carimport:autoMentes', function(source, cb, rendeles)
+ESX.RegisterServerCallback('sacra_carimport:getJob', function(source,cb)
+    local xPlayer = ESX.GetPlayerFromId(source)
+    MySQL.Async.fetchScalar("SELECT `job` FROM `users` WHERE `identifier` = @identifier", {
+        ['@identifier'] = xPlayer.identifier
+    }, function(melo)
+        cb(melo)
+    end)
+end)
 
-
+ESX.RegisterServerCallback('sacra_carimport:getGrade', function(source,cb)
+    local xPlayer = ESX.GetPlayerFromId(source)
+    MySQL.Async.fetchScalar("SELECT `job_grade` FROM `users` WHERE `identifier` = @identifier", {
+        ['@identifier'] = xPlayer.identifier
+    }, function(grade)
+        cb(grade)
+    end)
 end)
 
 

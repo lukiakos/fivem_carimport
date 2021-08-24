@@ -13,6 +13,7 @@ autok = {
     {label = "Adder - 1000$", value = 'adder', price = 1000, carid = 2},
     {label = "Voltic - 2000$", value = 'voltic', price = 2000, carid = 3},
 	{label = "Phoenix - 1200$", value = 'phoenix', price = 1200, carid = 4},
+	{label = "Barracks - 1000", value = 'barracks', price = 1000, carid = 5},
 }
 
 igenmenu = {
