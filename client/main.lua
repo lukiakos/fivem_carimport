@@ -201,10 +201,6 @@ function CreateMarkers(result,value,rendeles)
     end
 end
 
-RegisterCommand('heading', function()
-    print(GetEntityHeading(ped))
-end,false)
-
 function Fizet(osszeg,result,value,rendeles)
     ESX.TriggerServerCallback('sacra_carimport:frakciopenzlevonas', function(success)
         if success then
